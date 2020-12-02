@@ -1,12 +1,12 @@
 NAME=mocker-go
-VERSION=v1.0
+VERSION=v1.1
 
 .PHONY: all build clean
 
 all: build
 
 build:
-	go build -o ${NAME} ../main.go	
+	go build -tags netgo -o ${NAME} ../main.go	
 	docker build -t ${NAME}:${VERSION} --no-cache --rm .
 
 clean:

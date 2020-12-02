@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>企银第79代最强挡板</title>
+</head>
+<body>
+<script type="text/javascript">
+    var socket;
+
+    function connect() {
+        let ipaddress = document.getElementById("ipaddress").value;
+        if (!ipaddress) {
+            alert("需要输入ip地址");
+            return;
+        }
+        if ('WebSocket' in window) {
+            socket = new WebSocket("ws://" + ipaddress + "/monitor");
+            console.log("连接成功");
+            document.getElementById('connectBtn').disabled = true;
+        } else if ('MozWebSocket' in window) {
+            socket = new MozWebSocket("ws://" + ipaddress + "/monitor")
+        } else {
+            alert("浏览器不支持websocket")
+        }
+
+        // 接收到消息的回调
+        socket.onmessage = function (ev) {
+            let ta = document.getElementById('responseText');
+            ta.value += ev.data + '\n'
+            heartCheck.reset().start();
+        };
+
+        // 连接成功建立的回调方法
+        socket.onopen = function (ev) {
+            heartCheck.reset().start();
+            let ta = document.getElementById('responseText');
+            ta.value += "打开websocket服务正常\n"
+        };
+
+        socket.onerror = function() {
+            heartCheck.stop()
+            let ta = document.getElementById('responseText');
+            ta.value += "websocket连接发生错误\n"
+        }
+
+        window.onbeforeunload = function(){
+            heartCheck.stop()
+            socket.close();
+        }
+
+        socket.onclose = function () {
+            heartCheck.reset()
+        }
+
+        var heartCheck = {
+            timeout: 5000,
+            serverTimeoutObj: null,
+            reset: function(){
+                clearTimeout(this.timeout);
+                clearTimeout(this.serverTimeoutObj);
+                return this;
+            },
+            start: function(){
+                this.serverTimeoutObj = setInterval(function(){
+                    if(socket.readyState === 1){
+                        socket.send("ping");
+                        console.log("发送心跳");
+                        heartCheck.reset().start();    // 如果获取到消息，说明连接是正常的，重置心跳检测
+                    }else{
+                        console.log("断开状态，尝试重连");
+                        socket = new WebSocket("ws://" + ipaddress + "/monitor");
+                    }
+                }, this.timeout)
+            }
+        }
+    }
+
+    function disconnect() {
+        socket.close();
+        socket.onclose()
+        document.getElementById('connectBtn').disabled = false;
+        let ta = document.getElementById('responseText');
+        ta.value += "关闭websocket\n"
+    }
+
+    function clear() {
+        let ta = document.getElementById('responseText');
+        ta.value = ""
+    }
+
+    window.onload = function () {
+        document.getElementById('btn').addEventListener('click', clear);
+        document.getElementById('connectBtn').addEventListener('click', connect);
+        document.getElementById('disconnectBtn').addEventListener('click', disconnect)
+    }
+ 
+</script>
+
+<form onsubmit="return false;">
+    <h3>服务端返回的报文</h3>
+    <textarea id="responseText" style="width: 800px;height: 600px; float: left;"></textarea>
+    <div style="float: left; margin-left: 30px; width: 50%; word-break: break-all">
+        <h3>使用手册</h3>
+        <p>云账单(新通道) <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 响应成功: /json/ <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 响应失败(对方成功接收请求但返回失败且http状态码为400): /json/failure <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 自定义失败状态: /json/failure/{httpStatus} <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>(例如: /json/failure/500 将返回500状态码; /failure/404 将返回404状态码; 请输入合法的Http状态码)</i> <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 响应报文错误(对方成功接收请求但未按约定格式返回报文): /failure/format <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 请求超时(模拟网络超时的情况): /json/failure/timeout <br/>
+
+            约定的返回报文格式如下: <br/>
+            {
+                "msgNbr": "",
+                "rtnCode": "suc0000",
+                "rtnText": ""
+            }
+            <hr/>
+            交易通 <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 响应成功: / <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 响应失败: /failure <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 响应报文错误: /failure/format <br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;- 请求超时: /failure/timeout <br/>
+        </p>
+    </div>
+    <div style="clear: both;"></div>
+    <br><br>
+    <input type="text" id="ipaddress" placeholder="127.0.0.1:8080 或 域名"/>
+    <input type="button" value="连接" id="connectBtn"/>
+    <input type="button" value="断开" id="disconnectBtn"/>
+    <br><br>
+    <input type="button" value="清屏" id="btn"/>
+</form>
+
+</body>
+</html>
